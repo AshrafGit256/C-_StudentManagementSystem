@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using StudentAPI.Models;
+using StudentAPI.Data;
 
 namespace StudentAPI.Controllers;
 
@@ -7,41 +9,28 @@ namespace StudentAPI.Controllers;
 [Route("api/[controller]")]
 public class StudentsController : ControllerBase
 {
-    // Temporary in-memory list (we'll replace this with a database later)
-    private static List<Student> students = new()
+    private readonly AppDbContext _context;
+
+    // Constructor - injects the database context
+    public StudentsController(AppDbContext context)
     {
-        new Student
-        {
-            Id = 1,
-            Name = "John Doe",
-            Email = "john@example.com",
-            Age = 20,
-            Course = "Computer Science",
-            EnrollmentDate = new DateTime(2024, 9, 1)
-        },
-        new Student
-        {
-            Id = 2,
-            Name = "Jane Smith",
-            Email = "jane@example.com",
-            Age = 22,
-            Course = "Engineering",
-            EnrollmentDate = new DateTime(2023, 9, 1)
-        }
-    };
+        _context = context;
+    }
 
     // GET: api/students
     [HttpGet]
-    public IActionResult GetAllStudents()
+    public async Task<IActionResult> GetAllStudents()
     {
+        var students = await _context.Students.ToListAsync();
         return Ok(students);
     }
 
     // GET: api/students/1
     [HttpGet("{id}")]
-    public IActionResult GetStudentById(int id)
+    public async Task<IActionResult> GetStudentById(int id)
     {
-        var student = students.FirstOrDefault(s => s.Id == id);
+        var student = await _context.Students.FindAsync(id);
+
         if (student == null)
             return NotFound($"Student with ID {id} not found");
 
@@ -50,21 +39,20 @@ public class StudentsController : ControllerBase
 
     // POST: api/students
     [HttpPost]
-    public IActionResult CreateStudent([FromBody] Student student)
+    public async Task<IActionResult> CreateStudent([FromBody] Student student)
     {
-        // Generate new ID
-        student.Id = students.Any() ? students.Max(s => s.Id) + 1 : 1;
-
-        students.Add(student);
+        _context.Students.Add(student);
+        await _context.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetStudentById), new { id = student.Id }, student);
     }
 
     // PUT: api/students/1
     [HttpPut("{id}")]
-    public IActionResult UpdateStudent(int id, [FromBody] Student updatedStudent)
+    public async Task<IActionResult> UpdateStudent(int id, [FromBody] Student updatedStudent)
     {
-        var student = students.FirstOrDefault(s => s.Id == id);
+        var student = await _context.Students.FindAsync(id);
+
         if (student == null)
             return NotFound($"Student with ID {id} not found");
 
@@ -74,20 +62,23 @@ public class StudentsController : ControllerBase
         student.Course = updatedStudent.Course;
         student.EnrollmentDate = updatedStudent.EnrollmentDate;
 
+        await _context.SaveChangesAsync();
+
         return Ok(student);
     }
 
     // DELETE: api/students/1
     [HttpDelete("{id}")]
-    public IActionResult DeleteStudent(int id)
+    public async Task<IActionResult> DeleteStudent(int id)
     {
-        var student = students.FirstOrDefault(s => s.Id == id);
+        var student = await _context.Students.FindAsync(id);
+
         if (student == null)
             return NotFound($"Student with ID {id} not found");
 
-        students.Remove(student);
+        _context.Students.Remove(student);
+        await _context.SaveChangesAsync();
 
         return Ok(new { message = $"Student {student.Name} deleted successfully" });
     }
-
 }
